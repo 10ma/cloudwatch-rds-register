@@ -1,0 +1,51 @@
+sns_topic:
+  name: 'alarms'
+  mail: 'alarms@example.com'
+
+cloudwatch_metrics_DBInstanceIdentifier: 'rds_instance_name'
+rds_disk_sizeGiB: 20
+
+# このdb_classを変更することでvars/db_classを読みこみ上記metricsの計算でしきい値がかわる
+db_class: 'db.t2.micro'
+#db_class: db.m5.large
+
+
+
+
+
+
+
+#CPU CreditBalance - インスタンスクラス毎のCPUクレジット最大値の50%未満
+t2_cloudwatch_metrics:
+  name: "RDS_cpu-creditbalance"
+  namespace: "AWS/RDS"
+  metric: "CPUCreditBalance"
+  comparison: "<"
+  threshold: "{{ max_cpu_credit * 0.5 }}"
+
+
+cloudwatch_metrics:
+#FreeableMemory - インスタンスクラス毎の最大メモリの20％未満
+  - { name: "RDS_free_memory_ansible",
+        namespace: "AWS/RDS",
+        metric: "FreeableMemory",
+        comparison: "<",
+        threshold: "{{ free_memoryGiB * 1024 * 0.2 }}"
+    }
+#FreeStorageSpace - 割り当てたディスクサイズ最大値の20％未満
+  - { name: "RDS_free-storagespace",
+        namespace: "AWS/RDS",
+        metric: "FreeStorageSpace",
+        comparison: "<",
+        threshold: "{{ rds_disk_sizeGiB * 0.2 }}"
+    }
+#DatabaseConnections - max_connections設定値の80％以上
+  - { name: "RDS_Database-Connections",
+        namespace: "AWS/RDS",
+        metric: "DatabaseConnections",
+        comparison: ">=",
+        threshold: "{{ rds_max_connections | float * 0.8 }}"
+    }
+
+
+rds_max_connections: "{{ free_memoryGiB * 1024 * 1024 * 1024 / 12582880 }}"

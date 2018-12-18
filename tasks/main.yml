@@ -1,0 +1,44 @@
+- include_vars: "{{ db_class }}"
+
+- name: Create alarm SNS topic
+  sns_topic:
+    name: "{{ sns_topic.name }}"
+    state: present
+    region: "{{ aws_region | default('ap-northeast-1') }}"
+    subscriptions:
+      - endpoint: "{{ sns_topic.mail }}"
+        protocol: "email"
+  register: result_sns
+
+- name: create alarm
+  ec2_metric_alarm:
+    state: present
+    region: "{{ aws_region | default('ap-northeast-1') }}"
+    name: "{{ item.name }}"
+    metric: "{{ item.metric }}"
+    namespace: "{{ item.namespace }}"
+    statistic: "{{ item.statistic | default('Average') }}"
+    comparison: "{{ item.comparison }}"
+    threshold: "{{ item.threshold }}"
+    period: 300
+    evaluation_periods: 2
+    dimensions: {'DBInstanceIdentifier':'{{ cloudwatch_metrics_DBInstanceIdentifier }}'}
+    alarm_actions: ["{{ result_sns.sns_arn }}"]
+  with_items: "{{ cloudwatch_metrics }}"
+
+## T2系インスタンスのみCPUCreditBalanceのアラーム追加
+- name: create alarm - CPUCreditBalance (db.t2.*)
+  ec2_metric_alarm:
+    state: present
+    region: "{{ aws_region | default('ap-northeast-1') }}"
+    name: "{{ t2_cloudwatch_metrics.name }}"
+    metric: "{{ t2_cloudwatch_metrics.metric }}"
+    namespace: "{{ t2_cloudwatch_metrics.namespace }}"
+    statistic: "{{ t2_cloudwatch_metrics.statistic | default('Average') }}"
+    comparison: "{{ t2_cloudwatch_metrics.comparison }}"
+    threshold: "{{ t2_cloudwatch_metrics.threshold }}"
+    period: 300
+    evaluation_periods: 2
+    dimensions: {'DBInstanceIdentifier':'{{ cloudwatch_metrics_DBInstanceIdentifier }}'}
+    alarm_actions: ["{{ result_sns.sns_arn }}"]
+  when: db_class is search("t2")
